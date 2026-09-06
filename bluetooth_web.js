@@ -357,9 +357,7 @@ function renderFilesystem() {
     const sizeCell =
         document.createElement('td');
 
-    sizeCell.textContent =
-        formatFileSize(file.size);
-
+    sizeCell.textContent = file.isDirectory? '📁' : formatFileSize(file.size);
 
     // =========================
     // Acciones
@@ -371,7 +369,7 @@ function renderFilesystem() {
     const deleteButton =
         document.createElement('button');
 
-    deleteButton.textContent = file.isDirectory ? '📁' : '🗑️';
+    deleteButton.textContent = '🗑️';
 
     deleteButton.className =
         'btn-delete-file';

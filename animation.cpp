@@ -1,5 +1,6 @@
 #include "animation.h"
-#include "display.h"
+#include "display_oled.h"
+#include "display_led.h"
 #include "config.h"
 
 File animationFile;
@@ -19,12 +20,13 @@ uint32_t animationLastFrameTime = 0;
 uint32_t animationFrameDelay = 0;
 
 bool animationPlaying = false;
+bool usingLedDisplay = false;
 
 // ============================================================
 // Iniciar animación
 // ============================================================
 
-void startAnimation(String filename) {
+void startAnimation(String filename, bool ledDisplay) {
     // Si ya había una animación reproduciéndose, la detenemos primero.
     stopAnimation();
     animationFile = LittleFS.open(filename, "r");
@@ -61,13 +63,10 @@ void startAnimation(String filename) {
     }
 
     // Tamaño de un frame
- 
-    animationFrameSize = ((animationWidth * animationHeight) + 7) / 8;
+    if (ledDisplay) animationFrameSize = animationFrameSize = animationWidth * animationHeight * 2; // 2 bytes por pixel (RGB565)
+    else animationFrameSize = ((animationWidth * animationHeight) + 7) / 8;
 
-    // Comprobar tamaño del archivo
-
-    size_t expectedSize =
-        8 + animationFrameSize * animationNumFrames;
+    size_t expectedSize = 8 + animationFrameSize * animationNumFrames;
 
     if (animationFile.size() != expectedSize) {
         Serial.println("Tamano de archivo incorrecto");
@@ -78,7 +77,6 @@ void startAnimation(String filename) {
     }
 
     // Reservar memoria para UN solo frame
-
     animationBuffer = new uint8_t[animationFrameSize];
 
     if (animationBuffer == nullptr) {
@@ -107,11 +105,17 @@ void startAnimation(String filename) {
         return;
     }
 
-    showBufferScaled(
+    if (ledDisplay) displayLedShowBufferScaled(
         animationBuffer,
         animationWidth,
         animationHeight
     );
+    else displayOledShowBufferScaled(
+        animationBuffer,
+        animationWidth,
+        animationHeight
+    );
+    usingLedDisplay = ledDisplay;
 }
 
 void updateAnimation() {
@@ -145,8 +149,13 @@ void updateAnimation() {
         stopAnimation();
         return;
     }
-
-    showBufferScaled(
+    if (usingLedDisplay) {
+        displayLedShowBufferScaled(
+            animationBuffer,
+            animationWidth,
+            animationHeight
+        );
+    } else displayOledShowBufferScaled(
         animationBuffer,
         animationWidth,
         animationHeight
@@ -164,71 +173,4 @@ void stopAnimation() {
         animationBuffer = nullptr;
     }
     animationCurrentFrame = 0;
-}
-
-void showImage(String filename) {
-    File file = LittleFS.open(filename, "r");
-
-    if (!file) {
-        Serial.println("No se pudo abrir la imagen");
-        return;
-    }
-
-    // Comprobar que al menos contiene la cabecera
-    uint16_t width;
-    uint16_t height;
-
-    if (file.read((uint8_t*)&width, sizeof(width)) != sizeof(width) ||
-        file.read((uint8_t*)&height, sizeof(height)) != sizeof(height)) {
-        Serial.println("Error leyendo cabecera");
-        file.close();
-        return;
-    }
-
-    Serial.printf("Imagen: %dx%d\n", width, height);
-
-    // Comprobar dimensiones
-    if (width == 0 || height == 0) {
-        Serial.println("Dimensiones inválidas");
-        file.close();
-        return;
-    }
-
-    // Un píxel = 1 bit
-    size_t imageSize = ((width * height) + 7) / 8;
-
-    // Comprobar que el archivo tiene los datos esperados
-    if (file.size() != 4 + imageSize) {
-        Serial.println("Tamaño de archivo incorrecto");
-        file.close();
-        return;
-    }
-
-    // Comprobar que cabe en la OLED
-    if (width > SCREEN_WIDTH || height > SCREEN_HEIGHT) {
-        Serial.println("La imagen es demasiado grande para la OLED");
-        file.close();
-        return;
-    }
-
-    uint8_t *buffer = new uint8_t[imageSize];
-
-    if (buffer == nullptr) {
-        Serial.println("No hay memoria suficiente");
-        file.close();
-        return;
-    }
-
-    if (file.read(buffer, imageSize) != imageSize) {
-        Serial.println("Error leyendo imagen");
-        delete[] buffer;
-        file.close();
-        return;
-    }
-
-    file.close();
-
-    showBufferScaled(buffer, width, height);
-
-    delete[] buffer;
 }

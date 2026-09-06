@@ -23,11 +23,11 @@ extern uint16_t animationCurrentFrame;
 
 extern uint32_t animationLastFrameTime;
 extern uint32_t animationFrameDelay;
+extern bool usingLedDisplay;
 
 extern bool animationPlaying;
 
-void startAnimation(String filename);
-void showImage(String filename);
+void startAnimation(String filename, bool ledDisplay = false);
 void updateAnimation();
 void stopAnimation();
 

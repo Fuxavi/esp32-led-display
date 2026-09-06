@@ -11,7 +11,8 @@
 #include <BLE2902.h>
 
 #include "animation.h"
-#include "display.h"
+#include "display_led.h"
+#include "display_oled.h"
 #include "config.h"
 
 File uploadFile;
@@ -341,13 +342,6 @@ bool handleCommand(const String &msg, const String &source) {
     Serial.println("[BLE] >>> " + source + " command: delete"+ path);
     return deleteFile(path);
   }
-  if (msg.startsWith("/show ")) {
-    String path = msg.substring(6);
-    path.trim();
-    sendViaBLE("[FS] SHOW|"+path);
-    Serial.println("[BLE] >>> " + source + " command: show"+ path);
-    showImage(path);
-  }
   if (msg.startsWith("/play ")) {
     String path = msg.substring(6);
     path.trim();
@@ -428,7 +422,8 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  displayInit();
+  displayLedInit();
+  displayOledInit();
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
