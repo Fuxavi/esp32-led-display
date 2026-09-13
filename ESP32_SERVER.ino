@@ -2,12 +2,16 @@
 #include <WebServer.h>
 #include <WebSocketsServer.h>
 #include <LittleFS.h>
+#include <SPI.h>
+#include <SD.h>
 
 #include "animation.h"
 #include "display_led.h"
 #include "display_oled.h"
 #include "config.h"
 #include "index_html.h"
+
+SPIClass sdSPI(FSPI);
 
 // WiFi Access Point
 
@@ -31,22 +35,12 @@ String uploadFileName = "";
 size_t uploadFileSize = 0;
 bool uploadActive = false;
 
-// ============================================================
-// Timing
-// ============================================================
-
 unsigned long lastClientCheck = 0;
 const unsigned long CLIENT_CHECK_INTERVAL = 3000;
 
-// ============================================================
 // WebSocket state
-// ============================================================
 
 bool webSocketConnected = false;
-
-// ============================================================
-// Forward declarations
-// ============================================================
 
 void handleCommand(const String& msg, const String& source);
 void listFiles(const String& path);
@@ -56,9 +50,7 @@ void sendFileList();
 void sendWebSocketMessage(String msg);
 void broadcastWebSocket(String msg);
 
-// ============================================================
 // WebSocket messages
-// ============================================================
 
 void sendWebSocketMessage(String msg) {
     if (webSocketConnected) {
@@ -70,9 +62,7 @@ void broadcastWebSocket(String msg) {
     webSocket.broadcastTXT(msg);
 }
 
-// ============================================================
 // WebSocket callback
-// ============================================================
 
 void webSocketEvent(
     uint8_t num,
@@ -142,9 +132,7 @@ void handleCommand(
     const String& msg,
     const String& source
 ) {
-    // --------------------------------------------------------
     // FILES
-    // --------------------------------------------------------
 
     if (msg == "/files") {
         sendWebSocketMessage("[FS] BEGIN");
@@ -153,9 +141,7 @@ void handleCommand(
         return;
     }
 
-    // --------------------------------------------------------
     // MKDIR
-    // --------------------------------------------------------
 
     if (msg.startsWith("/mkdir ")) {
 
@@ -182,10 +168,7 @@ void handleCommand(
         return;
     }
 
-
-    // --------------------------------------------------------
     // RMDIR
-    // --------------------------------------------------------
 
     if (msg.startsWith("/rmdir ")) {
         String path = msg.substring(7);
@@ -199,10 +182,7 @@ void handleCommand(
         return;
     }
 
-
-    // --------------------------------------------------------
     // DELETE
-    // --------------------------------------------------------
 
     if (msg.startsWith("/delete ")) {
 
@@ -217,10 +197,7 @@ void handleCommand(
         return;
     }
 
-
-    // --------------------------------------------------------
     // PLAY
-    // --------------------------------------------------------
 
     if (msg.startsWith("/play ")) {
 
@@ -242,12 +219,7 @@ void handleCommand(
 
         return;
     }
-
-
-    // --------------------------------------------------------
     // HELP
-    // --------------------------------------------------------
-
     if (msg == "/help") {
 
         String help =
@@ -267,10 +239,7 @@ void handleCommand(
         return;
     }
 
-
-    // --------------------------------------------------------
     // Unknown command
-    // --------------------------------------------------------
 
     Serial.println(
         "[" + source +
@@ -883,9 +852,19 @@ void setup() {
     displayLedInit();
     displayOledInit();
 
+    sdSPI.begin(
+        SD_SCK,
+        SD_MISO,
+        SD_MOSI,
+        SD_CS
+    );
 
-    if (!LittleFS.begin(true)) Serial.println("[LittleFS] ERROR mounting filesystem");
-    else Serial.println("[LittleFS] Filesystem mounted successfully");
+    if (!SD.begin(SD_CS, sdSPI)) {
+        Serial.println("ERROR: no se ha podido inicializar la SD");
+        return;
+    }
+
+    Serial.println("SD OK");
 
     setupWiFi();
     setupHTTPServer();
