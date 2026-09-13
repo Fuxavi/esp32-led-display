@@ -1,2 +1,4 @@
 bad_frames/
 frames/
+*.png
+*.bin
