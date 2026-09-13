@@ -11,30 +11,30 @@ HUB75_I2S_CFG::i2s_pins pins = {
     LAT_PIN, OE_PIN, CLK_PIN
 };
 
-// Configuración del panel
-HUB75_I2S_CFG mxconfig(
-    LED_WIDTH,
-    LED_HEIGHT,
-    LED_CHAIN,
-    pins
-);
-
 // Objeto del display_led
 MatrixPanel_I2S_DMA *display_led = nullptr;
 
 
 void displayLedInit()
 {
+    // Configuración del panel
+    HUB75_I2S_CFG mxconfig(
+        LED_WIDTH,
+        LED_HEIGHT,
+        LED_CHAIN,
+        pins
+    );
+
     mxconfig.gpio.e = 18;
     mxconfig.driver = HUB75_I2S_CFG::FM6126A;
     mxconfig.clkphase = false;
 
     display_led = new MatrixPanel_I2S_DMA(mxconfig);
-    Serial.println("Inicializando HUB75...");
+    ////Serial.println("Inicializando HUB75...");
 
     if (!display_led->begin())
     {
-        Serial.println("Error inicializando HUB75");
+        ////Serial.println("Error inicializando HUB75");
         for (;;) delay(1000); //KILL
     }
 
@@ -43,7 +43,7 @@ void displayLedInit()
 
     display_led->fillScreen(display_led->color565(255,255,255));
 
-    Serial.println("HUB75 inicializado");
+    //Serial.println("HUB75 inicializado");
 }
 
 

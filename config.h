@@ -19,10 +19,10 @@
 
 // SD card pins
 
-#define CS_SD      5    // Pin de Slave Select (CS) para la tarjeta MicroSD
-#define SCK_SD     18   // Pin de SCK para la tarjeta MicroSD
-#define MISO_SD    19   // Pin de MISO para la tarjeta MicroSD
-#define MOSI_SD    23   // Pin de MOSI para la tarjeta MicroSD
+#define SD_CS      5    // Pin de Slave Select (CS) para la tarjeta MicroSD
+#define SD_SCK     18   // Pin de SCK para la tarjeta MicroSD
+#define SD_MISO    19   // Pin de MISO para la tarjeta MicroSD
+#define SD_MOSI    23   // Pin de MOSI para la tarjeta MicroSD
 
 // LED panel pins
 

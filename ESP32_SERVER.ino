@@ -824,8 +824,8 @@ void setup() {
     // Displays
 
     displayLedInit();
-    displayOledInit();
-
+    //displayOledInit();
+    /*
     sdSPI.begin(
         SD_SCK,
         SD_MISO,
@@ -837,6 +837,7 @@ void setup() {
         //Serial.println("ERROR: no se ha podido inicializar la SD");
         return;
     }
+    */
 
     //Serial.println("SD OK");
 

@@ -14,7 +14,7 @@ void displayOledInit()
 
     if (!display_oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR))
     {
-        Serial.println(F("SSD1306 allocation failed"));
+        //Serial.println(F("SSD1306 allocation failed"));
         for(;;); // Infinite loop to terminate program
     }
 

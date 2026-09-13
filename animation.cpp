@@ -32,7 +32,7 @@ void startAnimation(String filename, bool ledDisplay) {
     animationFile = LittleFS.open(filename, "r");
 
     if (!animationFile) {
-        Serial.println("No se pudo abrir la animacion");
+        ////Serial.println("No se pudo abrir la animacion");
         return;
     }
 
@@ -41,7 +41,7 @@ void startAnimation(String filename, bool ledDisplay) {
         animationFile.read((uint8_t*)&animationNumFrames, 2) != 2 ||
         animationFile.read((uint8_t*)&animationFPS, 2) != 2) {
 
-        Serial.println("Error leyendo cabecera");
+        //Serial.println("Error leyendo cabecera");
         stopAnimation();
         return;
     }
@@ -51,13 +51,13 @@ void startAnimation(String filename, bool ledDisplay) {
         animationWidth > SCREEN_WIDTH ||
         animationHeight > SCREEN_HEIGHT) {
 
-        Serial.println("Dimensiones invalidas");
+        //Serial.println("Dimensiones invalidas");
         stopAnimation();
         return;
     }*/
 
     if (animationNumFrames == 0) {
-        Serial.println("Numero de frames invalido");
+        //Serial.println("Numero de frames invalido");
         stopAnimation();
         return;
     }
@@ -69,9 +69,9 @@ void startAnimation(String filename, bool ledDisplay) {
     size_t expectedSize = 8 + animationFrameSize * animationNumFrames;
 
     if (animationFile.size() != expectedSize) {
-        Serial.println("Tamano de archivo incorrecto");
-        Serial.printf("Esperados: %d bytes\n", expectedSize);
-        Serial.printf("Recibidos: %d bytes\n",animationFile.size());
+        //Serial.println("Tamano de archivo incorrecto");
+        //Serial.printf("Esperados: %d bytes\n", expectedSize);
+        //Serial.printf("Recibidos: %d bytes\n",animationFile.size());
         stopAnimation();
         return;
     }
@@ -80,7 +80,7 @@ void startAnimation(String filename, bool ledDisplay) {
     animationBuffer = new uint8_t[animationFrameSize];
 
     if (animationBuffer == nullptr) {
-        Serial.println("No hay memoria suficiente");
+        //Serial.println("No hay memoria suficiente");
         stopAnimation();
         return;
     }
@@ -99,14 +99,14 @@ void startAnimation(String filename, bool ledDisplay) {
             animationFrameSize
         ) != animationFrameSize) {
 
-        Serial.println("Error leyendo primer frame");
+        //Serial.println("Error leyendo primer frame");
 
         stopAnimation();
         return;
     }
 
     if (ledDisplay) {
-        Serial.println("Showing on LED display");
+        //Serial.println("Showing on LED display");
             displayLedShowBufferScaled(
             animationBuffer,
             animationWidth,
@@ -147,7 +147,7 @@ void updateAnimation() {
             animationFrameSize
         ) != animationFrameSize) {
 
-        Serial.println("Error leyendo frame");
+        ////Serial.println("Error leyendo frame");
 
         stopAnimation();
         return;
