@@ -75,7 +75,7 @@ void webSocketEvent(
         case WStype_CONNECTED:
 
             webSocketConnected = true;
-            Serial.println("[WS] Client connected");
+            //Serial.println("[WS] Client connected");
 
             webSocket.sendTXT(
                 num,
@@ -84,7 +84,7 @@ void webSocketEvent(
             break;
 
         case WStype_DISCONNECTED:
-            Serial.println("[WS] Client disconnected");
+            //Serial.println("[WS] Client disconnected");
             // There could still be another client.
             // Check the server state through the connection list
             webSocketConnected = false;
@@ -105,9 +105,7 @@ void webSocketEvent(
                 return;
             }
 
-            Serial.println(
-                "[WEB] Command: " + msg
-            );
+            //Serial.println("[WEB] Command: " + msg);
 
             handleCommand(
                 msg,
@@ -152,13 +150,9 @@ void handleCommand(
             path = "/" + path;
         }
 
-        Serial.println(
-            "[" + source +
-            "] mkdir " +
-            path
-        );
+        //Serial.println("[" + source + "] mkdir " + path);
 
-        if (LittleFS.mkdir(path)) {
+        if (SD.mkdir(path)) {
             sendWebSocketMessage("[FS] MKDIR|" + path);
         }
         else {
@@ -208,11 +202,7 @@ void handleCommand(
             path = "/" + path;
         }
 
-        Serial.println(
-            "[" + source +
-            "] play " +
-            path
-        );
+        //Serial.println("[" + source + "] play " + path);
 
         sendWebSocketMessage("[FS] PLAY|" + path);
         startAnimation(path);
@@ -233,7 +223,7 @@ void handleCommand(
             "/delete "
             "/play";
 
-        Serial.println(help);
+        //Serial.println(help);
         sendWebSocketMessage(help);
 
         return;
@@ -241,11 +231,7 @@ void handleCommand(
 
     // Unknown command
 
-    Serial.println(
-        "[" + source +
-        "] Unknown command: " +
-        msg
-    );
+    //Serial.println("[" + source + "] Unknown command: " + msg);
 
 
     sendWebSocketMessage(
@@ -259,7 +245,7 @@ void handleCommand(
 
 void listFiles(const String& path) {
 
-    File root = LittleFS.open(path);
+    File root = SD.open(path);
     if (!root || !root.isDirectory()) {
         sendWebSocketMessage(
             "[FS] ERROR opening " +
@@ -347,7 +333,7 @@ void addFilesRecursive(File dir, String currentPath, String &json, bool &first) 
 
 void sendFileList() {
     String json = "[";
-    File root = LittleFS.open("/");
+    File root = SD.open("/");
 
     if (!root || !root.isDirectory()) {
         if (root) root.close();
@@ -386,9 +372,9 @@ bool deleteFilePath(const String& path) {
         return false;
     }
 
-    Serial.println("[FS] Delete: " + path);
+    //Serial.println("[FS] Delete: " + path);
 
-    if (!LittleFS.exists(path)) {
+    if (!SD.exists(path)) {
         sendWebSocketMessage(
             "[FS] DELETE_ERROR|File not found|" +
             path
@@ -396,8 +382,7 @@ bool deleteFilePath(const String& path) {
         return false;
     }
 
-
-    if (LittleFS.remove(path)) {
+    if (SD.remove(path)) {
         sendWebSocketMessage(
             "[FS] DELETED|" +
             path
@@ -423,7 +408,7 @@ bool deleteDirectory(const String& path) {
     }
 
 
-    File dir = LittleFS.open(path);
+    File dir = SD.open(path);
 
     if (!dir || !dir.isDirectory()) {
         sendWebSocketMessage(
@@ -447,14 +432,14 @@ bool deleteDirectory(const String& path) {
         file.close();
 
         if (isDir) deleteDirectory(fullPath);
-        else LittleFS.remove(fullPath);
+        else SD.remove(fullPath);
 
         file =dir.openNextFile();
     }
 
     dir.close();
 
-    if (LittleFS.rmdir(path)) {
+    if (SD.rmdir(path)) {
         sendWebSocketMessage(
             "[FS] RMDIR|" +
             path
@@ -493,26 +478,21 @@ void handleUpload() {
             uploadFileName = "/" + uploadFileName;
         }
 
-        Serial.println();
-        Serial.println(
-            "================================"
-        );
+        //Serial.println();
+        //Serial.println("================================");
 
-        Serial.println(
-            "[UPLOAD] Start: " +
-            uploadFileName
-        );
+        //Serial.println("[UPLOAD] Start: " +uploadFileName);
 
         if (uploadFile) uploadFile.close();
 
         uploadFile =
-            LittleFS.open(
+            SD.open(
                 uploadFileName,
                 "w"
             );
 
         if (!uploadFile) {
-            Serial.println("[UPLOAD] ERROR: cannot open file");
+            //Serial.println("[UPLOAD] ERROR: cannot open file");
             uploadActive = false;
 
             return;
@@ -538,9 +518,7 @@ void handleUpload() {
             uploadFileSize += written;
 
             if (written != upload.currentSize) {
-                Serial.println(
-                    "[UPLOAD] ERROR: write failed"
-                );
+                //Serial.println("[UPLOAD] ERROR: write failed");
                 uploadFile.close();
                 uploadActive = false;
             }
@@ -551,9 +529,9 @@ void handleUpload() {
         if (uploadActive && uploadFile) uploadFile.close();
         uploadActive = false;
 
-        Serial.println("[UPLOAD] Finished: " + uploadFileName);
-        Serial.println("[UPLOAD] Size: " + String(uploadFileSize));
-        Serial.println("================================");
+        //Serial.println("[UPLOAD] Finished: " + uploadFileName);
+        //Serial.println("[UPLOAD] Size: " + String(uploadFileSize));
+        //Serial.println("================================");
 
         broadcastWebSocket(
             "[FILE] UPLOAD_COMPLETE|" +
@@ -565,15 +543,15 @@ void handleUpload() {
     }
     else if (upload.status == UPLOAD_FILE_ABORTED) {
 
-        Serial.println("[UPLOAD] ABORTED");
+        //Serial.println("[UPLOAD] ABORTED");
 
         if (uploadFile) uploadFile.close();
         uploadActive = false;
 
         if (
             uploadFileName.length() > 0 &&
-            LittleFS.exists(uploadFileName)
-        ) LittleFS.remove(uploadFileName);
+            SD.exists(uploadFileName)
+        ) SD.remove(uploadFileName);
 
         broadcastWebSocket(
             "[FILE] UPLOAD_ABORTED"
@@ -692,7 +670,7 @@ void handleApiMkdir() {
 
     if (!path.startsWith("/")) path = "/" + path;
 
-    if (LittleFS.mkdir(path)) {
+    if (SD.mkdir(path)) {
         sendWebSocketMessage("[FS] MKDIR|" + path);
         server.send(
             200,
@@ -725,9 +703,7 @@ void handleNotFound() {
 
 void setupWiFi() {
 
-    Serial.println(
-        "[WiFi] Configuring AP..."
-    );
+    //Serial.println("[WiFi] Configuring AP...");
 
     if (
         !WiFi.softAPConfig(
@@ -736,9 +712,7 @@ void setupWiFi() {
             subnet
         )
     ) {
-        Serial.println(
-            "[WiFi] AP configuration failed"
-        );
+        //Serial.println("[WiFi] AP configuration failed");
     }
 
 
@@ -752,32 +726,32 @@ void setupWiFi() {
         );
 
     if (!result) {
-        Serial.println("[WiFi] Failed to start AP!");
+        //Serial.println("[WiFi] Failed to start AP!");
         return;
     }
 
-    Serial.println();
-    Serial.println("========================================");
-    Serial.println("             ESP32 WiFi AP");
-    Serial.println("========================================");
+    //Serial.println();
+    //Serial.println("========================================");
+    //Serial.println("             ESP32 WiFi AP");
+    //Serial.println("========================================");
 
-    Serial.print("SSID     : ");
-    Serial.println(AP_SSID);
+    //Serial.print("SSID     : ");
+    //Serial.println(AP_SSID);
 
-    Serial.print("Password : ");
-    Serial.println(AP_PASSWORD);
+    //Serial.print("Password : ");
+    //Serial.println(AP_PASSWORD);
 
-    Serial.print("Channel  : ");
-    Serial.println(WiFi.channel());
+    //Serial.print("Channel  : ");
+    //Serial.println(WiFi.channel());
 
 
-    Serial.print("AP MAC   : ");
-    Serial.println(WiFi.softAPmacAddress());
+    //Serial.print("AP MAC   : ");
+    //Serial.println(WiFi.softAPmacAddress());
 
-    Serial.print("IP       : ");
-    Serial.println(WiFi.softAPIP());
+    //Serial.print("IP       : ");
+    //Serial.println(WiFi.softAPIP());
 
-    Serial.println("========================================");
+    //Serial.println("========================================");
 
 }
 
@@ -831,21 +805,21 @@ void setupHTTPServer() {
 
     server.begin();
 
-    Serial.println("[HTTP] Server started on port 80");
+    //Serial.println("[HTTP] Server started on port 80");
 }
 
 void setup() {
 
-    Serial.begin(115200);
+    //Serial.begin(115200);
 
     delay(3000);
 
     pinMode(LED_PIN, OUTPUT);
 
-    Serial.println();
-    Serial.println("========================================");
-    Serial.println("       ESP32 WiFi Controller");
-    Serial.println("========================================");
+    //Serial.println();
+    //Serial.println("========================================");
+    //Serial.println("       ESP32 WiFi Controller");
+    //Serial.println("========================================");
 
     // Displays
 
@@ -860,11 +834,11 @@ void setup() {
     );
 
     if (!SD.begin(SD_CS, sdSPI)) {
-        Serial.println("ERROR: no se ha podido inicializar la SD");
+        //Serial.println("ERROR: no se ha podido inicializar la SD");
         return;
     }
 
-    Serial.println("SD OK");
+    //Serial.println("SD OK");
 
     setupWiFi();
     setupHTTPServer();
@@ -872,46 +846,19 @@ void setup() {
     webSocket.begin();
     webSocket.onEvent(webSocketEvent);
 
-    Serial.println("[WS] WebSocket server started on port 81");
+    //Serial.println("[WS] WebSocket server started on port 81");
 
     // Information
 
-    Serial.println();
-    Serial.println("Connect your device to:");
+    //Serial.println();
+    //Serial.println("Connect your device to:");
 
-    Serial.print("    SSID: ");
-    Serial.println(AP_SSID);
+    //Serial.print("    SSID: ");
+    //Serial.println(AP_SSID);
 
-    Serial.println("Then open:");
-    Serial.println("    http://192.168.4.1");
-    Serial.println();
-
-
-    Serial.printf(
-        "Flash total: %u bytes\n",
-        ESP.getFlashChipSize()
-    );
-
-    Serial.printf(
-        "Sketch usado: %u bytes\n",
-        ESP.getSketchSize()
-    );
-
-    Serial.printf(
-        "Sketch libre: %u bytes\n",
-        ESP.getFreeSketchSpace()
-    );
-
-    Serial.printf(
-        "Heap libre: %u bytes\n",
-        ESP.getFreeHeap()
-    );
-
-    Serial.printf(
-        "Heap mínimo: %u bytes\n",
-        ESP.getMinFreeHeap()
-    );
-
+    //Serial.println("Then open:");
+    //Serial.println("    http://192.168.4.1");
+    //Serial.println();
 }
 
 void loop() {
@@ -920,6 +867,7 @@ void loop() {
     webSocket.loop();
     updateAnimation();
 
+    /*
     if (Serial.available()) {
 
         String msg =
@@ -936,6 +884,7 @@ void loop() {
         }
 
     }
+    */
 
     unsigned long now = millis();
 
