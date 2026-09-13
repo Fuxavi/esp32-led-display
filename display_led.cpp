@@ -3,12 +3,20 @@
 
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 
+HUB75_I2S_CFG::i2s_pins pins = {
+    R1_PIN, G1_PIN, B1_PIN,
+    R2_PIN, G2_PIN, B2_PIN,
+    A_PIN, B_PIN, C_PIN, D_PIN,
+    E_PIN,
+    LAT_PIN, OE_PIN, CLK_PIN
+};
 
 // Configuración del panel
 HUB75_I2S_CFG mxconfig(
     LED_WIDTH,
     LED_HEIGHT,
-    LED_CHAIN
+    LED_CHAIN,
+    pins
 );
 
 // Objeto del display_led
