@@ -27,7 +27,7 @@ extern bool usingLedDisplay;
 
 extern bool animationPlaying;
 
-void startAnimation(String filename, bool ledDisplay = false);
+void startAnimation(String filename, bool ledDisplay = true);
 void updateAnimation();
 void stopAnimation();
 

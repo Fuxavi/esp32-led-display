@@ -1,0 +1,570 @@
+#pragma once
+
+#include <Arduino.h>
+
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>ESP32 Control</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: #eee;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+}
+
+h1 {
+    margin-top: 0;
+}
+
+.card {
+    background: #1d1d1d;
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 18px;
+}
+
+button {
+    border: none;
+    border-radius: 7px;
+    padding: 10px 16px;
+    margin: 4px;
+    cursor: pointer;
+    background: #333;
+    color: white;
+    font-size: 15px;
+}
+
+button:hover {
+    background: #444;
+}
+
+button.danger {
+    background: #7b2020;
+}
+
+button.green {
+    background: #176b35;
+}
+
+input {
+    background: #222;
+    border: 1px solid #444;
+    color: white;
+    padding: 10px;
+    border-radius: 6px;
+    margin: 4px;
+}
+
+#status {
+    font-weight: bold;
+}
+
+.connected {
+    color: #4cff7a;
+}
+
+.disconnected {
+    color: #ff5555;
+}
+
+#files {
+    margin-top: 10px;
+}
+
+.file {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+    padding: 10px 0;
+    gap: 10px;
+}
+
+.file-name {
+    flex: 1;
+    word-break: break-all;
+}
+
+.log {
+    background: #080808;
+    border-radius: 6px;
+    padding: 10px;
+    height: 220px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+}
+
+.upload-area {
+    border: 2px dashed #444;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.small {
+    color: #999;
+    font-size: 13px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>ESP32 Control</h1>
+
+<div class="card">
+
+<h2>Connection</h2>
+
+<div>
+Status:
+<span id="status" class="disconnected">
+Disconnected
+</span>
+</div>
+
+<div class="small">
+ESP32: 192.168.4.1
+</div>
+
+</div>
+
+<div class="card">
+
+<h2>Animation</h2>
+
+<input
+    id="commandInput"
+    placeholder="/mkdir prueba"
+>
+
+<button onclick="sendCommand(commandInput.value)">
+Send Command
+</button>
+
+<button onclick="sendCommand('/help')">
+Help
+</button>
+
+</div>
+
+
+<div class="card">
+
+<h2>Upload file</h2>
+
+<div class="upload-area">
+
+<input
+    type="file"
+    id="fileInput"
+>
+
+<br>
+
+
+
+<div class="file-controls">
+    
+      
+    <label for="dirSelect">Select Target Directory:</label>
+
+    <select id="dirSelect">
+        <option value="/" selected>/</option>
+    </select>
+    
+    <br>
+
+    <button onclick="uploadFile()">
+    Upload
+    </button>
+
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>Files</h2>
+
+<button onclick="refreshFiles()">
+Refresh
+</button>
+
+<button onclick="createDirectory()">
+Create folder
+</button>
+
+<div id="files">
+Loading...
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>Console</h2>
+
+<div id="log" class="log"></div>
+
+</div>
+
+</div>
+
+
+<script>
+
+let socket = null;
+let dirSelect = document.getElementById("dirSelect");
+
+// ============================================================
+// WebSocket
+// ============================================================
+
+function connectWebSocket() {
+
+    socket = new WebSocket("ws://" + location.hostname + ":81/");
+
+    socket.onopen = function() {
+
+        document.getElementById("status").textContent =
+            "Connected";
+
+        document.getElementById("status").className =
+            "connected";
+
+        addLog("[WebSocket] Connected");
+
+    };
+
+
+    socket.onclose = function() {
+
+        document.getElementById("status").textContent =
+            "Disconnected";
+
+        document.getElementById("status").className =
+            "disconnected";
+
+        addLog("[WebSocket] Disconnected");
+
+        setTimeout(connectWebSocket, 2000);
+
+    };
+
+
+    socket.onerror = function() {
+
+        addLog("[WebSocket] Error");
+
+    };
+
+
+    socket.onmessage = function(event) {
+
+        addLog(event.data);
+
+        if (
+            event.data.includes("[FS]") ||
+            event.data.includes("[FILE]")
+        ) {
+            refreshFiles();
+        }
+
+    };
+
+}
+
+
+// ============================================================
+// Commands
+// ============================================================
+
+function sendCommand(command) {
+
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        addLog("[ERROR] WebSocket not connected");
+        return;
+    }
+    socket.send(command);
+}
+
+
+function playAnimation() {
+    const path = document.getElementById("playPath").value.trim();
+    if (!path) {
+        addLog("[ERROR] Enter animation path");
+        return;
+    }
+    sendCommand("/play " + path);
+}
+
+
+// ============================================================
+// File upload
+// ============================================================
+
+async function uploadFile() {
+
+    const input = document.getElementById("fileInput");
+
+    if (!input.files.length) {
+        addLog("[ERROR] Select a file first");
+        return;
+    }
+
+    const file = input.files[0];
+    addLog(
+        "[UPLOAD] Uploading " +
+        file.name +
+        " (" +
+        file.size +
+        " bytes)"
+    );
+
+    const formData = new FormData();
+    formData.append("file", file, dirSelect.value + file.name);
+
+    try {
+
+        const response =
+            await fetch("/upload", {
+                method: "POST",
+                body: formData
+            });
+
+
+        const text = await response.text();
+        addLog(text);
+        refreshFiles();
+    }
+    catch (error) {
+        addLog(
+            "[UPLOAD] ERROR: " +
+            error
+        );
+    }
+
+}
+
+// ============================================================
+// File listing
+// ============================================================
+
+async function refreshFiles() {
+
+    try {
+        const root = document.createElement('option');
+        root.value = "/";
+        root.textContent = "/";
+        
+        const response = await fetch("/api/files");
+        const data = await response.json();
+        const container = document.getElementById("files");
+        container.innerHTML = "";
+        dirSelect.innerHTML = '';
+        dirSelect.appendChild(root);
+
+        data.forEach(file => {
+            const row = document.createElement("div");
+            row.className = "file";
+
+            const name = document.createElement("div");
+            name.className = "file-name";
+
+            name.textContent = file.path;
+
+            const size = document.createElement("div");
+            size.className = "file-size";
+            size.textContent =
+                file.directory
+                    ? "<DIR>"
+                    : formatBytes(file.size);
+
+
+            row.appendChild(name);
+            row.appendChild(size);
+
+            if (!file.directory) {
+
+                const play = document.createElement("button");
+                play.textContent = "Play";
+
+                play.onclick =
+                    function() {
+                        sendCommand(
+                            "/play " + file.path
+                        );
+
+                    };
+
+                row.appendChild(play);
+            }
+            else {
+                const option = document.createElement('option');
+                option.value = file.path+ "/";
+                option.textContent = file.path + "/";
+                dirSelect.appendChild(option);
+            }
+
+            const del = document.createElement("button");
+            del.textContent = "Delete";
+            del.className = "danger";
+
+            del.onclick =
+                async function() {
+                    if (
+                        !confirm(
+                            "Delete " +
+                            file.path +
+                            "?"
+                        )
+                    ) return;
+                    
+                    const response =
+                        await fetch(
+                            file.directory? "/api/rmdir" : "/api/delete",
+                            formatFetchBody(file.path)
+                        );
+
+                    addLog(await response.text());
+                    refreshFiles();
+                };
+
+            row.appendChild(del);
+            container.appendChild(row);
+        });
+    }
+    catch (error) {
+        addLog(
+            "[FILES] ERROR: " +
+            error
+        );
+    }
+
+}
+
+function formatFetchBody(path) {
+    return {method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: "path=" + encodeURIComponent(path)
+        }
+}
+
+// ============================================================
+// Create directory
+// ============================================================
+
+async function createDirectory() {
+
+    const name =
+        prompt(
+            "Directory path:",
+            "/newfolder"
+        );
+
+    if (!name) {
+        return;
+    }
+
+
+    const response =
+        await fetch(
+            "/api/mkdir",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/x-www-form-urlencoded"
+                },
+
+                body:
+                    "path=" +
+                    encodeURIComponent(name)
+            }
+        );
+
+
+    addLog(
+        await response.text()
+    );
+
+    refreshFiles();
+
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
+function formatBytes(bytes) {
+
+    if (bytes < 1024)
+        return bytes + " B";
+
+    if (bytes < 1024 * 1024)
+        return (bytes / 1024).toFixed(1) + " KB";
+
+    return (
+        bytes /
+        (1024 * 1024)
+    ).toFixed(2) + " MB";
+
+}
+
+
+function addLog(text) {
+    const log = document.getElementById("log");
+    const time = new Date().toLocaleTimeString();
+    log.textContent +=
+        "[" + time + "] " +
+        text +
+        "\n";
+
+    log.scrollTop = log.scrollHeight;
+}
+
+// ============================================================
+// Startup
+// ============================================================
+
+connectWebSocket();
+refreshFiles();
+
+</script>
+
+</body>
+
+</html>
+)rawliteral";

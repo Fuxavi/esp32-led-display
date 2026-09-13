@@ -3,7 +3,6 @@
 
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 
-// Configuración HUB75
 
 // Configuración del panel
 HUB75_I2S_CFG mxconfig(
@@ -13,20 +12,28 @@ HUB75_I2S_CFG mxconfig(
 );
 
 // Objeto del display_led
-MatrixPanel_I2S_DMA display_led(mxconfig);
+MatrixPanel_I2S_DMA *display_led = nullptr;
+
 
 void displayLedInit()
 {
+    mxconfig.gpio.e = 18;
+    mxconfig.driver = HUB75_I2S_CFG::FM6126A;
+    mxconfig.clkphase = false;
+
+    display_led = new MatrixPanel_I2S_DMA(mxconfig);
     Serial.println("Inicializando HUB75...");
 
-    if (!display_led.begin())
+    if (!display_led->begin())
     {
         Serial.println("Error inicializando HUB75");
         for (;;) delay(1000); //KILL
     }
 
-    display_led.setBrightness8(255);
-    display_led.clearScreen();
+    display_led->setBrightness8(50);
+    display_led->clearScreen();
+
+    display_led->fillScreen(display_led->color565(255,255,255));
 
     Serial.println("HUB75 inicializado");
 }
@@ -34,7 +41,7 @@ void displayLedInit()
 
 void displayLedShowBuffer(uint8_t* buffer, uint16_t width, uint16_t height)
 {
-    display_led.clearScreen();
+    display_led->clearScreen();
 
     for (uint16_t y = 0; y < height; y++)
     {
@@ -46,7 +53,7 @@ void displayLedShowBuffer(uint8_t* buffer, uint16_t width, uint16_t height)
                 buffer[pixelIndex * 2] |
                 (buffer[pixelIndex * 2 + 1] << 8);
 
-            display_led.drawPixel(x, y, color);
+            display_led->drawPixel(x, y, color);
         }
     }
 }
@@ -67,7 +74,7 @@ void displayLedShowBufferScaled(uint8_t* buffer, uint16_t width, uint16_t height
 
     int16_t offsetY = (LED_HEIGHT - scaledHeight) / 2;
 
-    display_led.clearScreen();
+    display_led->clearScreen();
 
     for (uint16_t y = 0; y < height; y++)
     {
@@ -80,7 +87,7 @@ void displayLedShowBufferScaled(uint8_t* buffer, uint16_t width, uint16_t height
                 buffer[pixelIndex * 2] |
                 (buffer[pixelIndex * 2 + 1] << 8);
 
-            display_led.fillRect(
+            display_led->fillRect(
                 offsetX + x * scale,
                 offsetY + y * scale,
                 scale,

@@ -46,7 +46,7 @@ void startAnimation(String filename, bool ledDisplay) {
         return;
     }
 
-    if (animationWidth == 0 ||
+    /*if (animationWidth == 0 ||
         animationHeight == 0 ||
         animationWidth > SCREEN_WIDTH ||
         animationHeight > SCREEN_HEIGHT) {
@@ -54,7 +54,7 @@ void startAnimation(String filename, bool ledDisplay) {
         Serial.println("Dimensiones invalidas");
         stopAnimation();
         return;
-    }
+    }*/
 
     if (animationNumFrames == 0) {
         Serial.println("Numero de frames invalido");
@@ -105,11 +105,14 @@ void startAnimation(String filename, bool ledDisplay) {
         return;
     }
 
-    if (ledDisplay) displayLedShowBufferScaled(
-        animationBuffer,
-        animationWidth,
-        animationHeight
-    );
+    if (ledDisplay) {
+        Serial.println("Showing on LED display");
+            displayLedShowBufferScaled(
+            animationBuffer,
+            animationWidth,
+            animationHeight
+        );
+    }
     else displayOledShowBufferScaled(
         animationBuffer,
         animationWidth,

@@ -16,6 +16,12 @@
 
 // ==================== LED ====================
 #define LED_PIN 2              // Onboard LED, controlled by /ledon and /ledoff commands
-// Define OLED I2C address (default is usually 0x3C or 0x3D)
+
+// SD card pins
+
+#define SD_CS    21
+#define SD_MOSI  33
+#define SD_SCK   32
+#define SD_MISO  35
 
 #endif
