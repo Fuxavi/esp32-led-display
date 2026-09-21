@@ -810,7 +810,7 @@ void setupHTTPServer() {
 
 void setup() {
 
-    //Serial.begin(115200);
+    Serial.begin(115200);
 
     delay(3000);
 
@@ -825,19 +825,14 @@ void setup() {
 
     displayLedInit();
     //displayOledInit();
-    /*
-    sdSPI.begin(
-        SD_SCK,
-        SD_MISO,
-        SD_MOSI,
-        SD_CS
-    );
+    
+    SPI.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
 
-    if (!SD.begin(SD_CS, sdSPI)) {
+    if (!SD.begin(SD_CS, SPI, 1000000)) {
         //Serial.println("ERROR: no se ha podido inicializar la SD");
         return;
     }
-    */
+    
 
     //Serial.println("SD OK");
 

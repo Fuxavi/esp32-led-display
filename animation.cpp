@@ -29,7 +29,7 @@ bool usingLedDisplay = false;
 void startAnimation(String filename, bool ledDisplay) {
     // Si ya había una animación reproduciéndose, la detenemos primero.
     stopAnimation();
-    animationFile = LittleFS.open(filename, "r");
+    animationFile = SD.open(filename, "r");
 
     if (!animationFile) {
         ////Serial.println("No se pudo abrir la animacion");

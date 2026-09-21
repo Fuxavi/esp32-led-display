@@ -2,7 +2,7 @@
 #define ANIMATION_H
 
 #include <Arduino.h>
-#include <LittleFS.h>
+#include <SD.h>
 
 // ============================================================
 // Variables de la animación
