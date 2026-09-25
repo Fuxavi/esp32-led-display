@@ -812,9 +812,7 @@ void setup() {
 
     Serial.begin(115200);
 
-    delay(3000);
-
-    pinMode(LED_PIN, OUTPUT);
+    //delay(3000);
 
     //Serial.println();
     //Serial.println("========================================");
@@ -832,6 +830,7 @@ void setup() {
         //Serial.println("ERROR: no se ha podido inicializar la SD");
         return;
     }
+    startTestAudio();
     
 
     //Serial.println("SD OK");
@@ -861,8 +860,9 @@ void loop() {
 
     server.handleClient();
     webSocket.loop();
-    updateAnimation();
-
+    //updateAnimation();
+    //updateAudio();
+    updateTestAudio();
     /*
     if (Serial.available()) {
 
@@ -883,29 +883,6 @@ void loop() {
     */
 
     unsigned long now = millis();
-
-    if (
-        now -
-        lastClientCheck >=
-        CLIENT_CHECK_INTERVAL
-    ) {
-
-        lastClientCheck = now;
-
-        int numClients = WiFi.softAPgetStationNum();
-
-        //Serial.print("[WiFi] Connected stations: ");
-
-        //Serial.println(numClients);
-
-        digitalWrite(
-            LED_PIN,
-            numClients > 0
-                ? HIGH
-                : LOW
-        );
-
-    }
 
     delay(2);
 }

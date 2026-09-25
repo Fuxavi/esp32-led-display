@@ -14,9 +14,6 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
-// ==================== LED ====================
-#define LED_PIN 2              // Onboard LED, controlled by /ledon and /ledoff commands
-
 // SD card pins
 
 #define SD_CS      5    // Pin de Slave Select (CS) para la tarjeta MicroSD
