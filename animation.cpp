@@ -2,7 +2,7 @@
 #include "display_oled.h"
 #include "display_led.h"
 #include "config.h"
-#include <Audio.h>
+#include <driver/i2s_std.h>
 
 // ============================================================
 // I2S - MAX98357A
@@ -12,8 +12,14 @@
 #define I2S_LRC  33
 #define I2S_DOUT 2
 
-Audio audio;
 
+#define AUDIO_SAMPLE_RATE 16000
+
+// Pequeño bloque para no ocupar demasiado tiempo en cada loop.
+// 512 bytes = 16 ms de audio a 16 kHz / 16 bit / mono.
+#define AUDIO_BUFFER_SIZE 512
+
+i2s_chan_handle_t i2sTxHandle = nullptr;
 
 // ============================================================
 // ARCHIVOS
@@ -21,7 +27,6 @@ Audio audio;
 
 File animationFile;
 File audioFile;
-
 
 // ============================================================
 // ANIMACIÓN
@@ -44,15 +49,181 @@ uint32_t animationFrameDelay = 0;
 bool animationPlaying = false;
 bool usingLedDisplay = false;
 
+
+// ============================================================
+// AUDIO
+// ============================================================
+
+uint32_t audioOffset = 0;
+uint32_t audioSize = 0;
+uint32_t audioSampleRate = 0;
+
+uint16_t audioChannels = 0;
+uint16_t audioBits = 0;
+
+uint32_t audioBytesPlayed = 0;
+bool audioPlaying = false;
+
+uint8_t audioBuffer[AUDIO_BUFFER_SIZE];
+
+
 // ============================================================
 // INICIALIZAR I2S
 // ============================================================
 
-void initAudio()
+bool initAudio()
 {
-    audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
-    audio.setVolume(100);
+    // Ya está inicializado
+    if (i2sTxHandle != nullptr) {
+        return true;
+    }
+
+    // --------------------------------------------------------
+    // Crear canal TX
+    // --------------------------------------------------------
+
+    i2s_chan_config_t chan_cfg =
+        I2S_CHANNEL_DEFAULT_CONFIG(
+            I2S_NUM_0,
+            I2S_ROLE_MASTER
+        );
+
+    esp_err_t err = i2s_new_channel(
+        &chan_cfg,
+        &i2sTxHandle,
+        nullptr
+    );
+
+    if (err != ESP_OK) {
+
+        i2sTxHandle = nullptr;
+
+        return false;
+    }
+
+    // --------------------------------------------------------
+    // Configuración I2S
+    // --------------------------------------------------------
+    //
+    // Philips = I2S estándar.
+    //
+    // MAX98357A funciona con I2S estándar.
+    //
+    // --------------------------------------------------------
+
+    i2s_std_config_t std_cfg = {
+
+        .clk_cfg =
+            I2S_STD_CLK_DEFAULT_CONFIG(
+                AUDIO_SAMPLE_RATE
+            ),
+
+        .slot_cfg =
+            I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(
+                I2S_DATA_BIT_WIDTH_16BIT,
+                I2S_SLOT_MODE_MONO
+            ),
+
+        .gpio_cfg = {
+
+            .mclk = I2S_GPIO_UNUSED,
+
+            .bclk =
+                (gpio_num_t)I2S_BCLK,
+
+            .ws =
+                (gpio_num_t)I2S_LRC,
+
+            .dout =
+                (gpio_num_t)I2S_DOUT,
+
+            .din =
+                I2S_GPIO_UNUSED,
+
+            .invert_flags = {
+
+                .mclk_inv = false,
+                .bclk_inv = false,
+                .ws_inv   = false
+            }
+        }
+    };
+
+    // --------------------------------------------------------
+    // Inicializar modo estándar
+    // --------------------------------------------------------
+
+    err = i2s_channel_init_std_mode(
+        i2sTxHandle,
+        &std_cfg
+    );
+
+    if (err != ESP_OK) {
+
+        i2s_del_channel(i2sTxHandle);
+
+        i2sTxHandle = nullptr;
+
+        return false;
+    }
+
+    // --------------------------------------------------------
+    // Activar canal
+    // --------------------------------------------------------
+
+    err = i2s_channel_enable(
+        i2sTxHandle
+    );
+
+    if (err != ESP_OK) {
+
+        i2s_del_channel(i2sTxHandle);
+
+        i2sTxHandle = nullptr;
+
+        return false;
+    }
+
+    // --------------------------------------------------------
+    // ENVIAR SILENCIO INICIAL
+    // --------------------------------------------------------
+    //
+    // 16 bits = 2 bytes por muestra
+    // 16000 Hz = 16000 muestras/segundo
+    //
+    // 512 bytes = 256 muestras
+    // 256 / 16000 = 16 ms
+    //
+    // 5 bloques = aproximadamente 80 ms
+    //
+    // --------------------------------------------------------
+
+    uint8_t silence[512] = {0};
+
+    size_t bytesWritten = 0;
+
+    for (int i = 0; i < 5; i++) {
+
+        err = i2s_channel_write(
+            i2sTxHandle,
+            silence,
+            sizeof(silence),
+            &bytesWritten,
+            100
+        );
+
+        if (err != ESP_OK) {
+            break;
+        }
+    }
+
+    // --------------------------------------------------------
+    // Inicialización correcta
+    // --------------------------------------------------------
+
+    return true;
 }
+
 
 // ============================================================
 // PARAR AUDIO
@@ -60,17 +231,11 @@ void initAudio()
 
 void stopAudio()
 {
-    audio.stopSong();
-}
-
-void startAudio(String filename) {
-    audio.stopSong();
-    audio.connecttoFS(SD, filename.c_str());
-}
-
-void updateAudio()
-{
-    audio.loop();
+    audioPlaying = false;
+    audioBytesPlayed = 0;
+    if (audioFile) {
+        audioFile.close();
+    }
 }
 
 // INICIAR ANIMACIÓN
@@ -232,7 +397,7 @@ void stopAnimation()
 // REPRODUCIR AUDIO DE PRUEBA
 // ============================================================
 
-bool startTestAudio()
+bool startAudio(String filename)
 {
     // Inicializar I2S
     if (!initAudio()) {
@@ -241,14 +406,14 @@ bool startTestAudio()
     }
 
     // Abrir archivo
-    testAudioFile = SD.open("/test.wav", FILE_READ);
+    audioFile = SD.open(filename.c_str(), FILE_READ);
 
-    if (!testAudioFile) {
-        Serial.println("ERROR: No se pudo abrir /test.wav");
+    if (!audioFile) {
+        Serial.println("ERROR: No se pudo abrir " + filename);
         return false;
     }
 
-    Serial.println("Reproduciendo /test.wav");
+    Serial.println("Reproduciendo "+ filename);
 
     // --------------------------------------------------------
     // IMPORTANTE:
@@ -256,9 +421,8 @@ bool startTestAudio()
     // Una cabecera WAV PCM normal suele ocupar 44 bytes.
     // --------------------------------------------------------
 
-    testAudioFile.seek(44);
-
-    testAudioPlaying = true;
+    audioFile.seek(44);
+    audioPlaying = true;
 
     return true;
 }
@@ -267,21 +431,21 @@ bool startTestAudio()
 // ACTUALIZAR AUDIO DE PRUEBA
 // ============================================================
 
-void updateTestAudio()
+void updateAudio()
 {
-    if (!testAudioPlaying) {
+    if (!audioPlaying) {
         return;
     }
 
-    if (!testAudioFile) {
-        testAudioPlaying = false;
+    if (!audioFile) {
+        audioPlaying = false;
         return;
     }
 
     // Leer bloque de audio
-    size_t bytesRead = testAudioFile.read(
-        testAudioBuffer,
-        sizeof(testAudioBuffer)
+    size_t bytesRead = audioFile.read(
+        audioBuffer,
+        sizeof(audioBuffer)
     );
 
     // --------------------------------------------------------
@@ -289,11 +453,8 @@ void updateTestAudio()
     // --------------------------------------------------------
 
     if (bytesRead == 0) {
-
         Serial.println("Fin del audio");
-
-        testAudioFile.seek(44);
-
+        audioFile.seek(44);
         return;
     }
 
@@ -305,7 +466,7 @@ void updateTestAudio()
 
     esp_err_t err = i2s_channel_write(
         i2sTxHandle,
-        testAudioBuffer,
+        audioBuffer,
         bytesRead,
         &bytesWritten,
         10

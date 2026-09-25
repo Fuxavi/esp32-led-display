@@ -30,8 +30,8 @@ extern bool animationPlaying;
 void startAnimation(String filename, bool ledDisplay = true);
 void updateAnimation();
 void stopAnimation();
-void startAudio(String filename);
-void initAudio();
+bool startAudio(String filename);
+bool initAudio();
 void updateAudio();
 
 #endif

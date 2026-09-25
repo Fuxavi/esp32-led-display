@@ -838,7 +838,8 @@ void setup() {
         //Serial.println("ERROR: no se ha podido inicializar la SD");
         return;
     }
-    initAudio();    
+    initAudio();
+    startAudio("/test.wav");    
 
     //Serial.println("SD OK");
 
