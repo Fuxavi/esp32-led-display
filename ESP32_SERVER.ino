@@ -205,7 +205,15 @@ void handleCommand(
         //Serial.println("[" + source + "] play " + path);
 
         sendWebSocketMessage("[FS] PLAY|" + path);
-        startAnimation(path);
+        if (path.endsWith(".wav")) {
+            startAudio(path);
+        }
+        else if (path.endsWith(".bin")) {
+            startAnimation(path);
+        }
+        else {
+            Serial.println("Formato no soportado: " + path);
+        }
 
         return;
     }
@@ -830,8 +838,7 @@ void setup() {
         //Serial.println("ERROR: no se ha podido inicializar la SD");
         return;
     }
-    startTestAudio();
-    
+    initAudio();    
 
     //Serial.println("SD OK");
 
@@ -860,9 +867,8 @@ void loop() {
 
     server.handleClient();
     webSocket.loop();
-    //updateAnimation();
-    //updateAudio();
-    updateTestAudio();
+    updateAnimation();
+    updateAudio();
     /*
     if (Serial.available()) {
 
