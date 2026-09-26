@@ -2,7 +2,11 @@
 #include "display_oled.h"
 #include "display_led.h"
 #include "config.h"
-#include <driver/i2s_std.h>
+#include <driver/i2s.h>
+
+#define I2S_PORT I2S_NUM_0
+
+bool i2sInitialized = false;
 
 // ============================================================
 // I2S - MAX98357A
@@ -19,7 +23,6 @@
 // 512 bytes = 16 ms de audio a 16 kHz / 16 bit / mono.
 #define AUDIO_BUFFER_SIZE 512
 
-i2s_chan_handle_t i2sTxHandle = nullptr;
 
 // ============================================================
 // ARCHIVOS
@@ -70,119 +73,163 @@ uint8_t audioBuffer[AUDIO_BUFFER_SIZE];
 // ============================================================
 // INICIALIZAR I2S
 // ============================================================
+#define DMA_BUF_COUNT 8
+#define DMA_BUF_LEN   256
 
 bool initAudio()
 {
-    // Ya está inicializado
-    if (i2sTxHandle != nullptr) {
+    // --------------------------------------------------------
+    // Si ya está inicializado
+    // --------------------------------------------------------
+
+    if (i2sInitialized) {
         return true;
     }
 
     // --------------------------------------------------------
-    // Crear canal TX
+    // Configuración I2S legacy
     // --------------------------------------------------------
 
-    i2s_chan_config_t chan_cfg =
-        I2S_CHANNEL_DEFAULT_CONFIG(
-            I2S_NUM_0,
-            I2S_ROLE_MASTER
-        );
+    i2s_config_t cfg = {
+        .mode =
+            (i2s_mode_t)(
+                I2S_MODE_MASTER |
+                I2S_MODE_TX
+            ),
 
-    esp_err_t err = i2s_new_channel(
-        &chan_cfg,
-        &i2sTxHandle,
+        .sample_rate =
+            AUDIO_SAMPLE_RATE,
+
+        .bits_per_sample =
+            I2S_BITS_PER_SAMPLE_16BIT,
+
+        // WAV estéreo: L R L R...
+        .channel_format =
+            I2S_CHANNEL_FMT_RIGHT_LEFT,
+
+        .communication_format =
+            I2S_COMM_FORMAT_I2S,
+
+        .intr_alloc_flags =
+            ESP_INTR_FLAG_LEVEL1,
+
+        .dma_buf_count =
+            DMA_BUF_COUNT,
+
+        .dma_buf_len =
+            DMA_BUF_LEN,
+
+        .use_apll =
+            true,
+
+        .tx_desc_auto_clear =
+            false,
+
+        .fixed_mclk =
+            0
+    };
+
+    // --------------------------------------------------------
+    // Pines I2S
+    // --------------------------------------------------------
+
+    i2s_pin_config_t pins = {
+        .bck_io_num =
+            (gpio_num_t)I2S_BCLK,
+
+        .ws_io_num =
+            (gpio_num_t)I2S_LRC,
+
+        .data_out_num =
+            (gpio_num_t)I2S_DOUT,
+
+        .data_in_num =
+            I2S_PIN_NO_CHANGE
+    };
+
+    // --------------------------------------------------------
+    // Instalar driver
+    // --------------------------------------------------------
+
+    esp_err_t err = i2s_driver_install(
+        I2S_PORT,
+        &cfg,
+        0,
         nullptr
     );
 
     if (err != ESP_OK) {
 
-        i2sTxHandle = nullptr;
+        Serial.print("[I2S] driver_install ERROR: ");
+        Serial.println((int)err);
 
         return false;
     }
 
     // --------------------------------------------------------
-    // Configuración I2S
-    // --------------------------------------------------------
-    //
-    // Philips = I2S estándar.
-    //
-    // MAX98357A funciona con I2S estándar.
-    //
+    // Configurar pines
     // --------------------------------------------------------
 
-    i2s_std_config_t std_cfg = {
-
-        .clk_cfg =
-            I2S_STD_CLK_DEFAULT_CONFIG(
-                AUDIO_SAMPLE_RATE
-            ),
-
-        .slot_cfg =
-            I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(
-                I2S_DATA_BIT_WIDTH_16BIT,
-                I2S_SLOT_MODE_MONO
-            ),
-
-        .gpio_cfg = {
-
-            .mclk = I2S_GPIO_UNUSED,
-
-            .bclk =
-                (gpio_num_t)I2S_BCLK,
-
-            .ws =
-                (gpio_num_t)I2S_LRC,
-
-            .dout =
-                (gpio_num_t)I2S_DOUT,
-
-            .din =
-                I2S_GPIO_UNUSED,
-
-            .invert_flags = {
-
-                .mclk_inv = false,
-                .bclk_inv = false,
-                .ws_inv   = false
-            }
-        }
-    };
-
-    // --------------------------------------------------------
-    // Inicializar modo estándar
-    // --------------------------------------------------------
-
-    err = i2s_channel_init_std_mode(
-        i2sTxHandle,
-        &std_cfg
+    err = i2s_set_pin(
+        I2S_PORT,
+        &pins
     );
 
     if (err != ESP_OK) {
 
-        i2s_del_channel(i2sTxHandle);
+        Serial.print("[I2S] set_pin ERROR: ");
+        Serial.println((int)err);
 
-        i2sTxHandle = nullptr;
+        i2s_driver_uninstall(I2S_PORT);
 
         return false;
     }
 
     // --------------------------------------------------------
-    // Activar canal
+    // Configurar frecuencia / bits / canales
     // --------------------------------------------------------
 
-    err = i2s_channel_enable(
-        i2sTxHandle
+    err = i2s_set_clk(
+        I2S_PORT,
+        AUDIO_SAMPLE_RATE,
+        I2S_BITS_PER_SAMPLE_16BIT,
+        I2S_CHANNEL_STEREO
     );
 
     if (err != ESP_OK) {
 
-        i2s_del_channel(i2sTxHandle);
+        Serial.print("[I2S] set_clk ERROR: ");
+        Serial.println((int)err);
 
-        i2sTxHandle = nullptr;
+        i2s_driver_uninstall(I2S_PORT);
 
         return false;
     }
+
+    // --------------------------------------------------------
+    // Limpiar DMA
+    // --------------------------------------------------------
+
+    err = i2s_zero_dma_buffer(
+        I2S_PORT
+    );
+
+    if (err != ESP_OK) {
+
+        Serial.print("[I2S] zero_dma ERROR: ");
+        Serial.println((int)err);
+
+        i2s_driver_uninstall(I2S_PORT);
+
+        return false;
+    }
+
+    // --------------------------------------------------------
+    // Marcar como inicializado
+    // --------------------------------------------------------
+
+    i2sInitialized = true;
+
 
     // --------------------------------------------------------
     // ENVIAR SILENCIO INICIAL
@@ -198,24 +245,6 @@ bool initAudio()
     //
     // --------------------------------------------------------
 
-    uint8_t silence[512] = {0};
-
-    size_t bytesWritten = 0;
-
-    for (int i = 0; i < 5; i++) {
-
-        err = i2s_channel_write(
-            i2sTxHandle,
-            silence,
-            sizeof(silence),
-            &bytesWritten,
-            100
-        );
-
-        if (err != ESP_OK) {
-            break;
-        }
-    }
 
     // --------------------------------------------------------
     // Inicialización correcta
@@ -430,7 +459,6 @@ bool startAudio(String filename)
 // ============================================================
 // ACTUALIZAR AUDIO DE PRUEBA
 // ============================================================
-
 void updateAudio()
 {
     if (!audioPlaying) {
@@ -442,7 +470,10 @@ void updateAudio()
         return;
     }
 
+    // --------------------------------------------------------
     // Leer bloque de audio
+    // --------------------------------------------------------
+
     size_t bytesRead = audioFile.read(
         audioBuffer,
         sizeof(audioBuffer)
@@ -453,28 +484,58 @@ void updateAudio()
     // --------------------------------------------------------
 
     if (bytesRead == 0) {
+
         Serial.println("Fin del audio");
+
         audioFile.seek(44);
+
         return;
     }
 
     // --------------------------------------------------------
-    // Enviar PCM directamente al I2S
+    // Asegurar que el bloque esté alineado con una muestra
+    //
+    // 16 bits estéreo = 4 bytes por frame
+    // L (2 bytes) + R (2 bytes)
+    // --------------------------------------------------------
+
+    bytesRead -= bytesRead % 4;
+
+    if (bytesRead == 0) {
+        return;
+    }
+
+    // --------------------------------------------------------
+    // Enviar PCM al I2S
     // --------------------------------------------------------
 
     size_t bytesWritten = 0;
 
-    esp_err_t err = i2s_channel_write(
-        i2sTxHandle,
+    esp_err_t err = i2s_write(
+        I2S_PORT,
         audioBuffer,
         bytesRead,
         &bytesWritten,
-        10
+        portMAX_DELAY
     );
 
     if (err != ESP_OK) {
 
-        Serial.print("ERROR I2S: ");
+        Serial.print("[I2S] write ERROR: ");
         Serial.println((int)err);
+
+        return;
+    }
+
+    // --------------------------------------------------------
+    // Comprobar escritura parcial
+    // --------------------------------------------------------
+
+    if (bytesWritten != bytesRead) {
+
+        Serial.print("[I2S] escritura parcial: ");
+        Serial.print(bytesWritten);
+        Serial.print("/");
+        Serial.println(bytesRead);
     }
 }
